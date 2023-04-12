@@ -78,3 +78,34 @@ struct PodPolicy {
     #[serde(rename = "imagePullSecrets", skip_serializing_if = "Vec::is_empty")]
     image_pull_secrets: Vec<LocalObjectReference>,
 }
+
+
+
+// Implement the persistent struct
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+struct Persistence {
+    #[serde(rename = "reclaimPolicy", skip_serializing_if = "Option::is_none")]
+    volume_reclaim_policy: Option<String>,
+
+    #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
+    persistent_volume_claim_spec: Option<v1::PersistentVolumeClaimSpec>,
+
+    #[serde(rename = "annotations", skip_serializing_if = "Option::is_none")]
+    annotations: Option<std::collections::BTreeMap<String, String>>,
+}
+
+// Implement the ZookeeperClusterSpec struct
+#[derive(Default, Serialize, Deserialize)]
+struct ZookeeperClusterSpec{
+    #[serde(rename = "image", skip_serializing_if = "Option::is_none")]
+    image: Option<ContainerImage>,
+
+    #[serde(rename = "replicas", skip_serializing_if = "Option::is_none")]
+    replicas: Option<i32>,
+
+    #[serde(rename = "storagetype", skip_serializing_if = "Option::is_none")]
+    storagetype: Option<string>,
+
+    #[serde(rename = "persistence", skip_serializing_if = "Option::is_none")]
+    persistence: Option<Persistence>,
+}
