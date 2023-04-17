@@ -17,7 +17,7 @@ futures = "0.3.17"
 schemars = "0.8.6"
 tracing = "0.1.36"
 tracing-subscriber = "0.3.3"
-
+zookeeper = "0.6"
 [[rust_controller]]
 name = "podset_controller"
 path = "src/podset_controller.rs"
