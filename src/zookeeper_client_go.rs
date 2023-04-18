@@ -4,7 +4,9 @@ use std::convert::TryInto;
 use std::collections::HashMap;
 use zookeeper::{CreateMode, Watcher, WatchedEvent, ZkResult, ZooKeeper};
 
-struct DefaultZookeeperClient {
+use super::zookeeper_type::ZookeeperCluster;
+
+pub struct DefaultZookeeperClient {
     conn: ZooKeeper,
 }
 
@@ -20,7 +22,7 @@ impl DefaultZookeeperClient {
         Ok(())
     }
 
-    fn create_node(&self, zoo: &v1beta1::ZookeeperCluster, z_node_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_node(&self, zoo: &ZookeeperCluster, z_node_path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let paths = z_node_path.split('/').filter(|&p| !p.is_empty()).collect::<Vec<_>>();
         let path_length = paths.len();
         let mut parent_path = String::new();

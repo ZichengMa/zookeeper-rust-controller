@@ -13,12 +13,20 @@ use thiserror::Error;
 
 mod zookeeper_type;
 mod status;
+mod zookeeper_client_go;
 use zookeeper_type::ZookeeperCluster;
+use zookeeper_client_go as zk;
 
 #[derive(Debug, Error)]
 enum Error {}
 const RECONCILE_TIME: Duration = Duration::from_secs(30);
 
+struct ZookeeperClusterReconciler {
+    client: kube::Client,
+    log: tracing_subscriber::fmt::Subscriber,
+    // scheme: kube::runtime::Scheme, can not find same in rust
+    zk_client: zk::DefaultZookeeperClient,
+}
 
 
 
