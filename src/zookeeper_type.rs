@@ -1,10 +1,18 @@
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1 as v1;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::api::{TypeMeta, ObjectMeta};
-use kube::CustomResource;
-use kube;
+use kube::{
+    api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
+    core::crd::CustomResourceExt,
+    Client, CustomResource,
+    runtime::controller::{Controller, Action}
+};
 use schemars::JsonSchema;
 use super::status::ZookeeperClusterStatus;
+use tokio::time::sleep;
+use tokio::time::Duration;
+use tracing::*;
 
 const DEFAULT_ZK_CONTAINER_REPOSITORY: &str = "default_zk_container_repository";
 const DEFAULT_ZK_CONTAINER_VERSION: &str = "default_zk_container_version";
@@ -151,3 +159,48 @@ pub struct ZookeeperClusterSpec{
 //     #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
 //     status: Option<ZookeeperClusterStatus>,
 // }
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+        // create CRD definition
+        let client = Client::try_default().await?;
+
+        // Manage CRDs first
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    
+        // Delete any old versions of it first:
+        let dp = DeleteParams::default();
+        // but ignore delete err if not exists
+        let _ = crds.delete("zookeepercluster.pravega.io", &dp).await.map(|res| {
+            res.map_left(|o| {
+                info!(
+                    "Deleting {}: ({:?})",
+                    o.name_any(),
+                    o.status.unwrap().conditions.unwrap().last()
+                );
+            })
+            .map_right(|s| {
+                // it's gone.
+                info!("Deleted old version: ({:?})", s);
+            })
+        });
+        // Wait for the delete to take place (map-left case or delete from previous run)
+        sleep(Duration::from_secs(2)).await;
+    
+        // Create the CRD so we can create Foos in kube
+        let zkcrd = ZookeeperCluster::crd();
+        info!("Creating zk CRD: {}", serde_json::to_string_pretty(&zkcrd)?);
+        let pp = PostParams::default();
+        let patch_params = PatchParams::default();
+        match crds.create(&pp, &zkcrd).await {
+            Ok(o) => {
+                info!("Created {} ({:?})", o.name_any(), o.status.unwrap());
+                debug!("Created CRD: {:?}", o.spec);
+            }
+            Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+            Err(e) => return Err(e.into()),                        // any other case is probably bad
+        }
+        // Wait for the api to catch up
+        sleep(Duration::from_secs(1)).await;
+    Ok(())
+}
