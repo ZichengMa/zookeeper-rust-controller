@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
-use k8s_openapi::api::core::v1 as v1;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-struct ZookeeperClusterStatus {
+pub struct ZookeeperClusterStatus {
     #[serde(rename = "members", skip_serializing_if = "Option::is_none")]
     members: Option<MembersStatus>,
 
@@ -40,13 +39,17 @@ struct MembersStatus {
     unready: Vec<String>,
 }
 
+const CONDITION_TRUE: &str = "True";
+const CONDITION_FALSE: &str = "False";
+const CONDITION_UNKNOWN: &str  = "Unknown";
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 struct ClusterCondition {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     condition_type: Option<ClusterConditionType>,
 
     #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
-    status: Option<v1::ConditionStatus>,
+    status: Option<String>, // original type: ConditionStatus
 
     #[serde(rename = "reason", skip_serializing_if = "Option::is_none")]
     reason: Option<String>,

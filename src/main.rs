@@ -11,22 +11,15 @@ use schemars::JsonSchema;
 use std::sync::Arc;
 use thiserror::Error;
 
+mod zookeeper_type;
+mod status;
+use zookeeper_type::ZookeeperCluster;
+
 #[derive(Debug, Error)]
 enum Error {}
+const RECONCILE_TIME: Duration = Duration::from_secs(30);
 
-/// A custom resource
-#[derive(CustomResource, Debug, Clone, Deserialize, Serialize, JsonSchema)]
-#[kube(group = "batch.tutorial.kubebuilder.io", version = "v1", kind = "PodSet", namespaced)]
-#[kube(status = "PodSetStatus")]
-pub struct PodSetSpec {
-    replicas: i32,
-}
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
-pub struct PodSetStatus {
-    podNames: Vec<String>,
-    readyReplicas: i32,
-}
 
 
 
@@ -35,7 +28,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init(); // init logging
     let client = Client::try_default().await?;
     let context = Arc::new(()); // bad empty context - put client in here
-    let podset = Api::<PodSet>::all(client.clone());
     let pods = Api::<Pod>::all(client.clone());
     Ok(())
 }
