@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1 as v1;
 use kube::api::{TypeMeta, ObjectMeta};
+use kube::CustomResource;
+use kube;
+use schemars::JsonSchema;
 use super::status::ZookeeperClusterStatus;
 
 const DEFAULT_ZK_CONTAINER_REPOSITORY: &str = "default_zk_container_repository";
@@ -12,7 +15,7 @@ const PULL_NEVER: &str = "Never";
 const PULL_IF_NOT_PRESENT: &str = "IfNotPresent";
 
 // Implement the ContainerImage struct
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct ContainerImage {
     repository: Option<String>,
     tag: Option<String>,
@@ -48,7 +51,7 @@ impl ContainerImage {
 
 
 // Implement the PodPolicy struct
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct PodPolicy {
     #[serde(rename = "labels", skip_serializing_if = "Option::is_none")]
     labels: Option<std::collections::BTreeMap<String, String>>,
@@ -90,20 +93,38 @@ struct PodPolicy {
 
 
 // Implement the persistent struct
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct Persistence {
     #[serde(rename = "reclaimPolicy", skip_serializing_if = "Option::is_none")]
     volume_reclaim_policy: Option<String>,
 
-    #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
-    persistent_volume_claim_spec: Option<v1::PersistentVolumeClaimSpec>,
+    // #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
+    // persistent_volume_claim_spec: Option<v1::PersistentVolumeClaimSpec>,
 
     #[serde(rename = "annotations", skip_serializing_if = "Option::is_none")]
     annotations: Option<std::collections::BTreeMap<String, String>>,
 }
 
+
 // Implement the ZookeeperClusterSpec struct
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(CustomResource, Serialize, Deserialize, Default, Clone, Debug, PartialEq, JsonSchema)]
+#[kube(
+    group = "pravega.io",
+    version = "v1beta1",
+    kind = "ZookeeperCluster",
+    plural = "zookeeperclusters",
+    shortname = "zk",
+    status = "ZookeeperClusterStatus",
+    // printcolumn = r#"[
+    //     {"name": "Replicas", "type": "integer", "jsonPath": ".spec.replicas", "description": "The number of ZooKeeper servers in the ensemble"},
+    //     {"name": "Ready Replicas", "type": "integer", "jsonPath": ".status.readyReplicas", "description": "The number of ZooKeeper servers in the ensemble that are in a Ready state"},
+    //     {"name": "Version", "type": "string", "jsonPath": ".status.currentVersion", "description": "The current Zookeeper version"},
+    //     {"name": "Desired Version", "type": "string", "jsonPath": ".spec.image.tag", "description": "The desired Zookeeper version"},
+    //     {"name": "Internal Endpoint", "type": "string", "jsonPath": ".status.internalClientEndpoint", "description": "Client endpoint internal to cluster network"},
+    //     {"name": "External Endpoint", "type": "string", "jsonPath": ".status.externalClientEndpoint", "description": "Client endpoint external to cluster network via LoadBalancer"},
+    //     {"name": "Age", "type": "date", "jsonPath": ".metadata.creationTimestamp"}
+    // ]"#
+)]
 pub struct ZookeeperClusterSpec{
     #[serde(rename = "image", skip_serializing_if = "Option::is_none")]
     image: Option<ContainerImage>,
@@ -119,14 +140,14 @@ pub struct ZookeeperClusterSpec{
 }
 
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ZookeeperCluster{
-    #[serde(flatten)]
-    pub type_meta: TypeMeta,
-    #[serde(rename = "metadata", skip_serializing_if = "Option::is_none")]
-    objectdata: Option<ObjectMeta>,
-    #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
-    spec: Option<ZookeeperClusterSpec>,
-    #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
-    status: Option<ZookeeperClusterStatus>,
-}
+
+// pub struct ZookeeperCluster{
+//     #[serde(flatten)]
+//     pub type_meta: TypeMeta,
+//     #[serde(rename = "metadata", skip_serializing_if = "Option::is_none")]
+//     objectdata: Option<ObjectMeta>,
+//     #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
+//     spec: Option<ZookeeperClusterSpec>,
+//     #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
+//     status: Option<ZookeeperClusterStatus>,
+// }

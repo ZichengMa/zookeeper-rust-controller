@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+use schemars::JsonSchema;
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ZookeeperClusterStatus {
     #[serde(rename = "members", skip_serializing_if = "Option::is_none")]
     members: Option<MembersStatus>,
@@ -30,7 +30,7 @@ pub struct ZookeeperClusterStatus {
     conditions: Vec<ClusterCondition>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct MembersStatus {
     #[serde(rename = "ready", skip_serializing_if = "Vec::is_empty")]
     ready: Vec<String>,
@@ -43,7 +43,7 @@ const CONDITION_TRUE: &str = "True";
 const CONDITION_FALSE: &str = "False";
 const CONDITION_UNKNOWN: &str  = "Unknown";
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct ClusterCondition {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     condition_type: Option<ClusterConditionType>,
@@ -64,7 +64,7 @@ struct ClusterCondition {
     last_transition_time: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 enum ClusterConditionType {
     #[serde(rename = "PodsReady")]
     PodsReady,
