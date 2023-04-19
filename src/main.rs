@@ -6,9 +6,9 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::Duration;
-
+use tokio::time::sleep;
 use futures::StreamExt;
-
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use schemars::JsonSchema;
 use std::sync::Arc;
 use thiserror::Error;
@@ -46,7 +46,50 @@ fn error_policy(obj: Arc<ZookeeperCluster>, _error: &Error, _ctx: Arc<()>) -> Ac
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+
+    {
+        // create CRD definition
+        let client = Client::try_default().await?;
+
+        // Manage CRDs first
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     
+        // Delete any old versions of it first:
+        let dp = DeleteParams::default();
+        // but ignore delete err if not exists
+        let _ = crds.delete("zookeepercluster.zookeeper.pravega.io", &dp).await.map(|res| {
+            res.map_left(|o| {
+                info!(
+                    "Deleting {}: ({:?})",
+                    o.name_any(),
+                    o.status.unwrap().conditions.unwrap().last()
+                );
+            })
+            .map_right(|s| {
+                // it's gone.
+                info!("Deleted old version: ({:?})", s);
+            })
+        });
+        // Wait for the delete to take place (map-left case or delete from previous run)
+        sleep(Duration::from_secs(2)).await;
+    
+        // Create the CRD so we can create Foos in kube
+        let zkcrd = ZookeeperCluster::crd();
+        info!("Creating zk CRD: {}", serde_json::to_string_pretty(&zkcrd)?);
+        let pp = PostParams::default();
+        match crds.create(&pp, &zkcrd).await {
+            Ok(o) => {
+                info!("Created {} ({:?})", o.name_any(), o.status.unwrap());
+                debug!("Created CRD: {:?}", o.spec);
+            }
+            Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+            Err(e) => return Err(e.into()),                        // any other case is probably bad
+        }
+        // Wait for the api to catch up
+        sleep(Duration::from_secs(1)).await;
+    }
+
     tracing_subscriber::fmt::init(); // init logging
     let client = Client::try_default().await?;
     let context = Arc::new(()); // bad empty context - put client in here
