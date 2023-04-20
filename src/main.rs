@@ -9,6 +9,7 @@ use tokio::time::Duration;
 use tokio::time::sleep;
 use futures::StreamExt;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use k8s_openapi::api::core::v1::Pod;
 use schemars::JsonSchema;
 use std::sync::Arc;
 use thiserror::Error;
@@ -18,6 +19,7 @@ mod status;
 mod zookeeper_client_go;
 use zookeeper_type::{ZookeeperClusterSpec, ZookeeperCluster};
 use zookeeper_client_go as zk;
+
 
 #[derive(Debug, Error)]
 enum Error {}
@@ -53,7 +55,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         // create CRD definition
         let client = Client::try_default().await?;
-
         // Manage CRDs first
         let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     
@@ -94,12 +95,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::fmt::init(); // init logging
     let client = Client::try_default().await?;
-    let zk_client = zk::DefaultZookeeperClient::new();
-    let log = tracing_subscriber::fmt::Subscriber::builder();
+    let zk_cluster = Api::<ZookeeperCluster>::all(client.clone());
+    let zk_client = zk::DefaultZookeeperClient::new("localhost:2181");
+    let pods = Api::<Pod>::all(client.clone());
+
+    let log = tracing_subscriber::fmt::Subscriber::new();
     let context = Arc::new(ZookeeperClusterReconciler{ client, log, zk_client }); // context with zookeeperclusterReconciler
 
-    let zk_cluster = Api::<ZookeeperCluster>::all(client.clone());
+
     Controller::new(zk_cluster, ListParams::default())
+        .owns(pods, ListParams::default())
         .run(reconcile, error_policy, context)
         .for_each(|res| async move {
             match res {

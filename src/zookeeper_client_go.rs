@@ -19,18 +19,19 @@ impl Watcher for MyWatcher {
 
 
 impl DefaultZookeeperClient {
-    // fn new() -> Result<Self, Box<dyn std::error::Error>> {
-    //     let conn = ZooKeeper::connect("localhost:2181", Duration::from_secs(5), WatcherFn)?;
-    //     Ok(Self { conn })
-    // }
-    
-    fn connect(&mut self, zk_uri: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn new(zk_uri: &str ) -> Self {
+        let conn = ZooKeeper::connect(zk_uri, Duration::from_secs(5), MyWatcher).unwrap();
+        Self {
+            conn,
+        }
+    }
+    pub fn connect(&mut self, zk_uri: &str) -> Result<(), Box<dyn std::error::Error>> {
         let conn = ZooKeeper::connect(zk_uri, Duration::from_secs(5), MyWatcher)?;
         self.conn = conn;
         Ok(())
     }
 
-    fn create_node(&self, zoo: &ZookeeperCluster, z_node_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn create_node(&self, zoo: &ZookeeperCluster, z_node_path: &str) -> Result<(), Box<dyn std::error::Error>> {
         // @TODO: Not sure whether flags=0 in zk-Go means CreateMode::Persistent in zk-rust.
         let paths = z_node_path.split('/').filter(|&p| !p.is_empty()).collect::<Vec<_>>();
         let path_length = paths.len();
@@ -50,13 +51,13 @@ impl DefaultZookeeperClient {
         Ok(())
     }
 
-    fn update_node(&self, path: &str, data: &str, version: i32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn update_node(&self, path: &str, data: &str, version: i32) -> Result<(), Box<dyn std::error::Error>> {
         let version_opt = Option::from(version);
         self.conn.set_data(path, data.as_bytes().to_vec(), version_opt)?;
         Ok(())
     }
 
-    fn node_exists(&self, z_node_path: &str) -> Result<i32, Box<dyn std::error::Error>> {
+    pub fn node_exists(&self, z_node_path: &str) -> Result<i32, Box<dyn std::error::Error>> {
         match self.conn.exists(z_node_path, false) {
             Ok(Some(stat)) => Ok(stat.version),
             Ok(None) => Err(Box::new(ZkError::NoNode)),
@@ -64,7 +65,7 @@ impl DefaultZookeeperClient {
         }
     }
 
-    fn close(&self) {
+    pub fn close(&self) {
         match self.conn.close(){
             Ok(_) => {},
             Err(e) => println!("Error while closing connection: {:?}", e),
