@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1 as v1;
+use k8s_openapi::api::core::v1::PersistentVolumeClaimSpec;
 
 use kube::api::{TypeMeta, ObjectMeta};
 use kube::{
@@ -105,8 +106,8 @@ struct Persistence {
     #[serde(rename = "reclaimPolicy", skip_serializing_if = "Option::is_none")]
     volume_reclaim_policy: Option<String>,
 
-    // #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
-    // persistent_volume_claim_spec: Option<v1::PersistentVolumeClaimSpec>,
+    #[serde(rename = "spec", skip_serializing_if = "Option::is_none")]
+    persistent_volume_claim_spec: Option<v1::PersistentVolumeClaimSpec>,
 
     #[serde(rename = "annotations", skip_serializing_if = "Option::is_none")]
     annotations: Option<std::collections::BTreeMap<String, String>>,

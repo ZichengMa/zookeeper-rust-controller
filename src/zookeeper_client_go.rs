@@ -2,7 +2,7 @@ use std::{fmt, time::Duration};
 use std::str::FromStr;
 use std::convert::TryInto;
 use std::collections::HashMap;
-use zookeeper::{CreateMode, Watcher, WatchedEvent, ZkResult, ZooKeeper};
+use zookeeper::{CreateMode, Watcher, WatchedEvent, ZkResult, ZooKeeper, ZkError};
 use zookeeper as zk;
 use super::zookeeper_type::ZookeeperCluster;
 
@@ -50,21 +50,24 @@ impl DefaultZookeeperClient {
         Ok(())
     }
 
-    // fn update_node(&self, path: &str, data: &str, version: i32) -> Result<(), Box<dyn std::error::Error>> {
-    //     let version: i32 = version.try_into().unwrap_or(-1);
-    //     self.conn.set_data(path, data.as_bytes().to_vec(), version)?;
-    //     Ok(())
-    // }
+    fn update_node(&self, path: &str, data: &str, version: i32) -> Result<(), Box<dyn std::error::Error>> {
+        let version_opt = Option::from(version);
+        self.conn.set_data(path, data.as_bytes().to_vec(), version_opt)?;
+        Ok(())
+    }
 
-    // fn node_exists(&self, z_node_path: &str) -> Result<i32, Box<dyn std::error::Error>> {
-    //     match self.conn.exists(z_node_path, false) {
-    //         Ok(Some(stat)) => Ok(stat.version()),
-    //         Ok(None) => Err(Box::new(ZkError::NoNode)),
-    //         Err(e) => Err(Box::new(e)),
-    //     }
-    // }
+    fn node_exists(&self, z_node_path: &str) -> Result<i32, Box<dyn std::error::Error>> {
+        match self.conn.exists(z_node_path, false) {
+            Ok(Some(stat)) => Ok(stat.version),
+            Ok(None) => Err(Box::new(ZkError::NoNode)),
+            Err(e) => Err(Box::new(e)),
+        }
+    }
 
-    // fn close(&self) {
-    //     self.conn.close();
-    // }
+    fn close(&self) {
+        match self.conn.close(){
+            Ok(_) => {},
+            Err(e) => println!("Error while closing connection: {:?}", e),
+        }
+    }
 }
