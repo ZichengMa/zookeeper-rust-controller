@@ -31,15 +31,17 @@ struct ZookeeperClusterReconciler {
 }
 
 
-async fn reconcile(g: Arc<ZookeeperCluster>, _ctx: Arc<()>) -> Result<Action, Error> {
+async fn reconcile(g: Arc<ZookeeperCluster>, _ctx: Arc<ZookeeperClusterReconciler>) -> Result<Action, Error> {
     // .. use api here to reconcile a child ConfigMap with ownerreferences
     // see configmapgen_controller example for full info
+    let zk_client = &_ctx.zk_client;
+    let client = &_ctx.client;
     println!("reconciling {:?}", g);
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
 /// object that caused the failure and the actual error
-fn error_policy(obj: Arc<ZookeeperCluster>, _error: &Error, _ctx: Arc<()>) -> Action {
+fn error_policy(obj: Arc<ZookeeperCluster>, _error: &Error, _ctx: Arc<ZookeeperClusterReconciler>) -> Action {
     Action::requeue(Duration::from_secs(60))
 }
 
@@ -92,7 +94,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::fmt::init(); // init logging
     let client = Client::try_default().await?;
-    let context = Arc::new(()); // bad empty context - put client in here
+    let zk_client = zk::DefaultZookeeperClient::new();
+    let log = tracing_subscriber::fmt::Subscriber::builder();
+    let context = Arc::new(ZookeeperClusterReconciler{ client, log, zk_client }); // context with zookeeperclusterReconciler
 
     let zk_cluster = Api::<ZookeeperCluster>::all(client.clone());
     Controller::new(zk_cluster, ListParams::default())
