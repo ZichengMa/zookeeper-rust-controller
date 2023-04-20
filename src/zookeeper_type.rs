@@ -137,8 +137,8 @@ pub struct ZookeeperClusterSpec{
     #[serde(rename = "image", skip_serializing_if = "Option::is_none")]
     image: Option<ContainerImage>,
 
-    #[serde(rename = "replicas", skip_serializing_if = "Option::is_none")]
-    replicas: Option<i32>,
+    #[serde(rename = "replicas", default)]
+    pub replicas: i32,
 
     #[serde(rename = "storageType", skip_serializing_if = "Option::is_none")]
     storagetype: Option<String>,
