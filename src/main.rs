@@ -37,8 +37,10 @@ async fn reconcile(g: Arc<ZookeeperCluster>, _ctx: Arc<ZookeeperClusterReconcile
     // .. use api here to reconcile a child ConfigMap with ownerreferences
     // see configmapgen_controller example for full info
     let zk_client = &_ctx.zk_client;
-    let client = &_ctx.client;
+    let client = _ctx.client.clone();
     println!("reconciling {:?}", g);
+    
+    
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 

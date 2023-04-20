@@ -6,6 +6,7 @@ use zookeeper::{CreateMode, Watcher, WatchedEvent, ZkResult, ZooKeeper, ZkError}
 use zookeeper as zk;
 use super::zookeeper_type::ZookeeperCluster;
 
+
 pub struct DefaultZookeeperClient {
     conn: ZooKeeper,
 }
