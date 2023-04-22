@@ -161,3 +161,40 @@ pub struct ZookeeperClusterSpec{
 //     status: Option<ZookeeperClusterStatus>,
 // }
 
+impl ZookeeperClusterSpec {
+    pub fn new() -> ZookeeperClusterSpec {
+        ZookeeperClusterSpec {
+            image: None,
+            replicas: 3,
+            storagetype: None,
+            persistence: None,
+        }
+    }
+    pub fn with_defaults() -> bool{
+        let mut changed = false;
+        if self.image.is_none() {
+            self.image = Some(ContainerImage::new());
+            changed = true;
+        }
+        if self.image.as_ref().unwrap().with_defaults() {
+            changed = true;
+        }
+        if self.replicas == 0 {
+            self.replicas = 3;
+            changed = true;
+        }
+        if self.storagetype.is_none() {
+            self.storagetype = Some(String::from(DEFAULT_ZK_STORAGE_TYPE));
+            changed = true;
+        }
+        if self.persistence.is_none() {
+            self.persistence = Some(Persistence::new());
+            changed = true;
+        }
+        if self.persistence.as_ref().unwrap().with_defaults() {
+            changed = true;
+        }
+        changed
+    }
+}
+

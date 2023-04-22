@@ -40,7 +40,11 @@ async fn reconcile(g: Arc<ZookeeperCluster>, _ctx: Arc<ZookeeperClusterReconcile
     let client = _ctx.client.clone();
     println!("reconciling {:?}", g);
     
+    let changed = g.with_defaults();
     
+    if changed {
+        // todo 
+    }
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
