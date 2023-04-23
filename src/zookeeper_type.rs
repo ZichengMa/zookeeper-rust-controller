@@ -198,3 +198,31 @@ impl ZookeeperClusterSpec {
     }
 }
 
+impl Persistence {
+    pub fn new() -> Persistence {
+        Persistence {
+            volume_reclaim_policy: None,
+            persistent_volume_claim_spec: None,
+            annotations: None,
+        }
+    }
+    pub fn with_defaults() -> bool {
+        let mut changed = false;
+        if self.volume_reclaim_policy.is_none() {
+            self.volume_reclaim_policy = Some(String::from(DEFAULT_ZK_VOLUME_RECLAIM_POLICY));
+            changed = true;
+        }
+        if self.persistent_volume_claim_spec.is_none() {
+            self.persistent_volume_claim_spec = Some(v1::PersistentVolumeClaimSpec::new());
+            changed = true;
+        }
+        if self.persistent_volume_claim_spec.as_ref().unwrap().with_defaults() {
+            changed = true;
+        }
+        if self.annotations.is_none() {
+            self.annotations = Some(std::collections::BTreeMap::new());
+            changed = true;
+        }
+        changed
+    }
+}
