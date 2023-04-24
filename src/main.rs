@@ -41,10 +41,21 @@ async fn reconcile(g: Arc<ZookeeperCluster>, _ctx: Arc<ZookeeperClusterReconcile
     println!("reconciling {:?}", g);
     
     let changed = g.with_defaults();
-    
+    if g.get_trigger_rolling_restart() {
+        ctx.log.info("Restarting zookeeper cluster");
+        let (annotation_key, annotation_value) = get_rolling_restart_annotation();
+        if instance.spec.pod.annotations.is_none() {
+            instance.spec.pod.annotations = Some(HashMap::new());
+        }
+        instance.spec.pod.annotations.as_mut().unwrap().insert(annotation_key, annotation_value);
+        instance.set_trigger_rolling_restart(false);
+        changed = true;
+    }
+
     if changed {
         // todo 
     }
+
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
@@ -120,4 +131,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .await; // controller does nothing unless polled
     Ok(())
+}
+
+
+impl ZookeeperCluster {
+    fn new(client: kube::Client, log: tracing_subscriber::fmt::Subscriber, zk_client: zk::DefaultZookeeperClient) -> ZookeeperClusterReconciler {
+        ZookeeperClusterReconciler {
+            client,
+            log,
+            zk_client,
+        }
+    }
 }

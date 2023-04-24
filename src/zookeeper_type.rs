@@ -146,6 +146,9 @@ pub struct ZookeeperClusterSpec{
 
     #[serde(rename = "persistence", skip_serializing_if = "Option::is_none")]
     persistence: Option<Persistence>,
+
+    #[serde(rename = "triggerRollingRestart", skip_serializing_if = "Option::is_none")]
+    triggerRollingRestart: Option<Bool>,
 }
 
 
@@ -224,5 +227,8 @@ impl Persistence {
             changed = true;
         }
         changed
+    }
+    pub fn get_trigger_rolling_restart(&self) -> bool {
+        self.spec.triggerRollingRestart
     }
 }
