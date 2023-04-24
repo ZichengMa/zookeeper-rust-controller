@@ -11,6 +11,8 @@ This project aims to write a controller for zookeeper on kubernetes in rust.
 
 2023.4.21 -- implement with_default() for zkcluster.. (used to judge state)
 
-TODO -- 1. based on Go controller, write logic for different states 2. figure out how to connect zookeeper/ open zookeeper cluster 3. pull a container image
+2023.4.23 -- implement rollingTriggerStart
+
+TODO -- 1. based on Go controller, write logic for different states 2. figure out how to connect zookeeper/ open zookeeper cluster 3. pull a container image 4. using client-zk to modify ConfigMap, SateFulSet, Service
 
 Not Sure: 1. Whether flags=0 in zk-Go means CreateMode::Persistent in zk-rust.

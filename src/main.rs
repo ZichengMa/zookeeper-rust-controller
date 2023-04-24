@@ -132,14 +132,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await; // controller does nothing unless polled
     Ok(())
 }
-
-
-impl ZookeeperCluster {
-    fn new(client: kube::Client, log: tracing_subscriber::fmt::Subscriber, zk_client: zk::DefaultZookeeperClient) -> ZookeeperClusterReconciler {
-        ZookeeperClusterReconciler {
-            client,
-            log,
-            zk_client,
-        }
-    }
-}
