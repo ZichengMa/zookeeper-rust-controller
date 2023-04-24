@@ -218,7 +218,7 @@ impl Persistence {
             annotations: None,
         }
     }
-    pub fn with_defaults(&self) -> bool {
+    pub fn with_defaults(&mut self) -> bool {
         let mut changed = false;
         if self.volume_reclaim_policy.is_none() {
             self.volume_reclaim_policy = Some(String::from("Retain"));
@@ -230,7 +230,9 @@ impl Persistence {
                 ..Default::default()
             });
         }
-        self.persistent_volume_claim_spec.as_ref().unwrap().access_modes = Some(vec![String::from("ReadWriteOnce")]);
+        let mut spec = self.persistent_volume_claim_spec.take().unwrap();
+        spec.access_modes = Some(vec![String::from("ReadWriteOnce")]);
+        self.persistent_volume_claim_spec = Some(spec);
         let storage = self.persistent_volume_claim_spec.as_ref().unwrap().resources.as_ref().unwrap().requests.as_ref().unwrap().get("storage");
         // @TODO: What is storage == 0?
         // if storage.is_none() || storage.unwrap().is_zero() {
@@ -417,7 +419,7 @@ impl Probes {
             liveness_probe: None,
         }
     }
-    fn with_defaults(&self) -> bool{
+    fn with_defaults(&mut self) -> bool{
         let mut changed = false;
         if self.readiness_probe.is_none() {
             changed = true;
@@ -486,7 +488,7 @@ pub struct ZookeeperClusterSpec{
     image: Option<ContainerImage>,
 
     #[serde(rename = "replicas", default)]
-    replicas: i32,
+    pub replicas: i32,
 
     #[serde(rename = "storageType", skip_serializing_if = "Option::is_none")]
     storagetype: Option<String>,
@@ -536,19 +538,19 @@ impl ZookeeperClusterSpec {
             ephemeral: None,
         }
     }
-    pub fn with_defaults(&self, z: &ZookeeperCluster) -> bool{
+    pub fn with_defaults(&mut self, z: & ZookeeperCluster) -> bool{
         let mut changed = false;
         if self.image.is_none() {
             self.image = Some(ContainerImage::new()); // Initialize the ContainerImage struct
         }
-        if self.image.as_ref().unwrap().with_defaults() {
+        if self.image.as_mut().unwrap().with_defaults() {
             changed = true;
         }
 
         if self.zkconfig.is_none() {
             self.zkconfig = Some(ZookeeperConfig::new()); // Initialize the ZookeeperConfig struct
         }
-        if self.zkconfig.as_ref().unwrap().with_defaults() {
+        if self.zkconfig.as_mut().unwrap().with_defaults() {
             changed = true;
         }
 
@@ -560,7 +562,7 @@ impl ZookeeperClusterSpec {
         if self.probes.is_none() {
             self.probes = Some(Probes::new()); // Initialize the Probes struct
         }
-        if self.probes.as_ref().unwrap().with_defaults() {
+        if self.probes.as_mut().unwrap().with_defaults() {
             changed = true;
         }
 
@@ -666,7 +668,7 @@ impl ZookeeperClusterSpec {
         if self.pod.is_none() {
             self.pod = Some(PodPolicy::new()); // Initialize the PodPolicy struct
         }
-        if self.pod.as_ref().unwrap().with_defaults(z) {
+        if self.pod.as_mut().unwrap().with_defaults(z) {
             changed = true;
         }
 
@@ -675,10 +677,10 @@ impl ZookeeperClusterSpec {
             self.storagetype = Some("".to_owned());
             changed = true;
         }
-        if  self.storagetype.as_ref().unwrap() == "ephemeral" {
+        if  self.storagetype.as_mut().unwrap() == "ephemeral" {
             if self.ephemeral.is_none() {
                 self.ephemeral = Some(Ephemeral::new()); // Initialize the Ephemeral struct
-                self.ephemeral.as_ref().unwrap().emptydirvolumesource = Some(v1::EmptyDirVolumeSource {..Default::default()});
+                self.ephemeral.as_mut().unwrap().emptydirvolumesource = Some(v1::EmptyDirVolumeSource {..Default::default()});
                 changed = true;
             }
         } else {
@@ -687,7 +689,7 @@ impl ZookeeperClusterSpec {
                 self.persistence = Some(Persistence::new()); // Initialize the Persistence struct
                 changed = true;
             }
-            if self.persistence.as_ref().unwrap().with_defaults() {
+            if self.persistence.as_mut().unwrap().with_defaults() {
                 self.storagetype = Some("persistence".to_owned());
                 changed = true;
             }
@@ -698,7 +700,19 @@ impl ZookeeperClusterSpec {
 
 
 impl ZookeeperCluster {
+    pub fn with_defaults(&mut self)->bool{
+        let mut changed = false;
+        let spec = &mut self.spec;
+        let temp = self;
+        if spec.with_defaults(temp) {
+            changed = true;
+        }
+        changed
+    }
     pub fn get_trigger_rolling_restart(&self) -> bool {
-        self.spec.triggerRollingRestart
+        if self.spec.triggerRollingRestart.is_none() {
+            return false;
+        }
+        self.spec.triggerRollingRestart.unwrap()
     }
 }

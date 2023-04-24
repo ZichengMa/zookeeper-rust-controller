@@ -13,6 +13,8 @@ This project aims to write a controller for zookeeper on kubernetes in rust.
 
 2023.4.23 -- implement rollingTriggerStart
 
-TODO -- 1. based on Go controller, write logic for different states 2. figure out how to connect zookeeper/ open zookeeper cluster 3. pull a container image 4. using client-zk to modify ConfigMap, SateFulSet, Service
+2023.4.24 -- almost finish all with_defaults() check    But immutable/mutable reference is not solved.
+
+TODO --  1.using client to modify ConfigMap, SateFulSet, Service 2. figure out how to connect zookeeper/ open zookeeper cluster 3. pull a container image 
 
 Not Sure: 1. Whether flags=0 in zk-Go means CreateMode::Persistent in zk-rust. 2. What is storage.is_Zero() with_defaults for Persistence

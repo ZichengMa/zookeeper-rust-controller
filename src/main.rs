@@ -33,23 +33,23 @@ struct ZookeeperClusterReconciler {
 }
 
 
-async fn reconcile(g: Arc<ZookeeperCluster>, _ctx: Arc<ZookeeperClusterReconciler>) -> Result<Action, Error> {
+async fn reconcile(mut g: Arc<ZookeeperCluster>, _ctx: Arc<ZookeeperClusterReconciler>) -> Result<Action, Error> {
     // .. use api here to reconcile a child ConfigMap with ownerreferences
     // see configmapgen_controller example for full info
     let zk_client = &_ctx.zk_client;
     let client = _ctx.client.clone();
     println!("reconciling {:?}", g);
-    
-    let changed = g.with_defaults();
+    let instance = Arc::get_mut(&mut g).unwrap();
+    let changed = instance.with_defaults();
     if g.get_trigger_rolling_restart() {
-        ctx.log.info("Restarting zookeeper cluster");
-        let (annotation_key, annotation_value) = get_rolling_restart_annotation();
-        if instance.spec.pod.annotations.is_none() {
-            instance.spec.pod.annotations = Some(HashMap::new());
-        }
-        instance.spec.pod.annotations.as_mut().unwrap().insert(annotation_key, annotation_value);
-        instance.set_trigger_rolling_restart(false);
-        changed = true;
+        info!("Restarting zookeeper cluster");
+        // let (annotation_key, annotation_value) = get_rolling_restart_annotation();
+        // if instance.spec.pod.annotations.is_none() {
+        //     instance.spec.pod.annotations = Some(HashMap::new());
+        // }
+        // instance.spec.pod.annotations.as_mut().unwrap().insert(annotation_key, annotation_value);
+        // instance.set_trigger_rolling_restart(false);
+        // changed = true;
     }
 
     if changed {
