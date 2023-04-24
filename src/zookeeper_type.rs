@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use k8s_openapi::api::core::v1 as v1;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1 as metav1;
 use k8s_openapi::api::core::v1::PersistentVolumeClaimSpec;
 use std::collections::HashMap;
 use kube::api::{TypeMeta, ObjectMeta};
@@ -22,7 +23,7 @@ const PULL_NEVER: &str = "Never";
 const PULL_IF_NOT_PRESENT: &str = "IfNotPresent";
 
 
-pub const DEFAULT_TERMINATION_GRACE_PERIOD: i32 = 30;
+pub const DEFAULT_TERMINATION_GRACE_PERIOD: i64 = 30;
 pub const DEFAULT_ZOOKEEPER_CACHE_VOLUME_SIZE: &str = "20Gi";
 pub const DEFAULT_READINESS_PROBE_INITIAL_DELAY_SECONDS: i32 = 10;
 pub const DEFAULT_READINESS_PROBE_PERIOD_SECONDS: i32 = 10;
@@ -87,8 +88,8 @@ struct PodPolicy {
     #[serde(rename = "nodeSelector", skip_serializing_if = "Option::is_none")]
     node_selector: Option<std::collections::BTreeMap<String, String>>,
 
-    // #[serde(rename = "affinity", skip_serializing_if = "Option::is_none")]
-    // affinity: Option<Affinity>,
+    #[serde(rename = "affinity", skip_serializing_if = "Option::is_none")]
+    affinity: Option<v1::Affinity>,
 
     // #[serde(rename = "topologySpreadConstraints", skip_serializing_if = "Vec::is_empty")]
     // topology_spread_constraints: Vec<TopologySpreadConstraint>,
@@ -118,6 +119,82 @@ struct PodPolicy {
     // image_pull_secrets: Vec<LocalObjectReference>,
 }
 
+impl PodPolicy {
+    fn new() -> Self {
+        PodPolicy {
+            labels: None,
+            node_selector: None,
+            affinity: None,
+            annotations: None,
+            termination_grace_period_seconds: None,
+            service_account_name: None,
+        }
+    }
+    fn with_defaults(&mut self, z: &ZookeeperCluster) -> bool {
+        let mut changed = false;
+
+        if self.labels.is_none() {
+            self.labels = Some(std::collections::BTreeMap::new());
+            changed = true;
+        }
+
+        if self.termination_grace_period_seconds.is_none() {
+            self.termination_grace_period_seconds = Some(DEFAULT_TERMINATION_GRACE_PERIOD);
+            changed = true;
+        }
+
+        if self.service_account_name.is_none() {
+            self.service_account_name = Some("default".to_owned());
+            changed = true;
+        }
+
+        if z.spec.pod.as_ref().unwrap().labels.is_none() {
+            self.labels = Some(std::collections::BTreeMap::new());
+            changed = true;
+        }
+
+        if !self.labels.as_ref().unwrap().contains_key("app") {
+            self.labels.as_mut().unwrap().insert("app".to_owned(), z.metadata.name.unwrap());
+            changed = true;
+        }
+
+        if !self.labels.as_ref().unwrap().contains_key("release") {
+            self.labels.as_mut().unwrap().insert("release".to_owned(), z.metadata.name.unwrap());
+            changed = true;
+        }
+
+        if self.affinity.is_none() {
+            self.affinity = Some(v1::Affinity {
+                pod_anti_affinity: Some(v1::PodAntiAffinity {
+                    preferred_during_scheduling_ignored_during_execution: Some(vec![
+                        v1::WeightedPodAffinityTerm {
+                            weight: 20,
+                            pod_affinity_term: v1::PodAffinityTerm {
+                                topology_key: "kubernetes.io/hostname".to_owned(),
+                                label_selector: Some(metav1::LabelSelector {
+                                    match_expressions:Some( vec![
+                                        metav1::LabelSelectorRequirement {
+                                            key: "app".to_owned(),
+                                            operator: "In".to_owned(),
+                                            values: Some(vec![z.metadata.name.unwrap()]),
+                                        },
+                                    ]),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            },
+                        },
+                    ]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            changed = true;
+        }
+
+        changed
+    }
+}
 
 
 // Implement the persistent struct
@@ -133,8 +210,40 @@ struct Persistence {
     annotations: Option<std::collections::BTreeMap<String, String>>,
 }
 
-
-
+impl Persistence {
+    pub fn new() -> Persistence {
+        Persistence {
+            volume_reclaim_policy: None,
+            persistent_volume_claim_spec: None,
+            annotations: None,
+        }
+    }
+    pub fn with_defaults(&self) -> bool {
+        let mut changed = false;
+        if self.volume_reclaim_policy.is_none() {
+            self.volume_reclaim_policy = Some(String::from("Retain"));
+            changed = true;
+        }
+        if self.persistent_volume_claim_spec.is_none() {
+            self.persistent_volume_claim_spec = Some(v1::PersistentVolumeClaimSpec {
+                access_modes: Some(vec![String::from("ReadWriteOnce")]),
+                ..Default::default()
+            });
+        }
+        self.persistent_volume_claim_spec.as_ref().unwrap().access_modes = Some(vec![String::from("ReadWriteOnce")]);
+        let storage = self.persistent_volume_claim_spec.as_ref().unwrap().resources.as_ref().unwrap().requests.as_ref().unwrap().get("storage");
+        // @TODO: What is storage == 0?
+        // if storage.is_none() || storage.unwrap().is_zero() {
+        //     self.persistent_volume_claim_spec.resources.requests =
+        //         std::collections::BTreeMap::from_iter(vec![(
+        //             v1::ResourceStorage,
+        //             resource::Quantity(DefaultZookeeperCacheVolumeSize.to_owned()),
+        //         )]);
+        //     changed = true;
+        // }
+        changed
+    }
+}
 
 // Implement zk config
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -301,8 +410,8 @@ struct Probes {
     liveness_probe: Option<Probe>,
 }
 
-impl Default for Probes {
-    fn default() -> Self {
+impl Probes {
+    fn new() -> Self {
         Probes {
             readiness_probe: None,
             liveness_probe: None,
@@ -313,27 +422,41 @@ impl Default for Probes {
         if self.readiness_probe.is_none() {
             changed = true;
             self.readiness_probe = Some(Probe {
-                initial_delay_seconds: Self::DEFAULT_INITIAL_DELAY_SECONDS,
-                period_seconds: Self::DEFAULT_PERIOD_SECONDS,
-                failure_threshold: Self::DEFAULT_FAILURE_THRESHOLD,
-                success_threshold: Self::DEFAULT_SUCCESS_THRESHOLD,
-                timeout_seconds: Self::DEFAULT_TIMEOUT_SECONDS,
+                initial_delay_seconds: Some(DEFAULT_READINESS_PROBE_INITIAL_DELAY_SECONDS),
+                period_seconds: Some(DEFAULT_READINESS_PROBE_PERIOD_SECONDS),
+                failure_threshold: Some(DEFAULT_READINESS_PROBE_FAILURE_THRESHOLD),
+                success_threshold: Some(DEFAULT_READINESS_PROBE_SUCCESS_THRESHOLD),
+                timeout_seconds: Some(DEFAULT_READINESS_PROBE_TIMEOUT_SECONDS),
             });
         }
         if self.liveness_probe.is_none() {
             changed = true;
             self.liveness_probe = Some(Probe {
-                initial_delay_seconds: Self::DEFAULT_INITIAL_DELAY_SECONDS,
-                period_seconds: Self::DEFAULT_PERIOD_SECONDS,
-                failure_threshold: Self::DEFAULT_FAILURE_THRESHOLD,
-                success_threshold: Self::DEFAULT_SUCCESS_THRESHOLD,
-                timeout_seconds: Self::DEFAULT_TIMEOUT_SECONDS,
+                initial_delay_seconds: Some(DEFAULT_LIVENESS_PROBE_INITIAL_DELAY_SECONDS),
+                period_seconds: Some(DEFAULT_LIVENESS_PROBE_PERIOD_SECONDS),
+                failure_threshold: Some(DEFAULT_LIVENESS_PROBE_FAILURE_THRESHOLD),
+                success_threshold: None,
+                timeout_seconds: Some(DEFAULT_LIVENESS_PROBE_TIMEOUT_SECONDS),
             });
         }
         changed
     }
 }
 
+
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+struct Ephemeral{
+    #[serde(rename="emptydirvolumesource", skip_serializing_if = "Option::is_none")]
+    emptydirvolumesource: Option<v1::EmptyDirVolumeSource>,
+}
+impl Ephemeral {
+    fn new() -> Self {
+        Ephemeral {
+            emptydirvolumesource: None,
+        }
+    }
+}
 
 
 
@@ -363,7 +486,7 @@ pub struct ZookeeperClusterSpec{
     image: Option<ContainerImage>,
 
     #[serde(rename = "replicas", default)]
-    pub replicas: i32,
+    replicas: i32,
 
     #[serde(rename = "storageType", skip_serializing_if = "Option::is_none")]
     storagetype: Option<String>,
@@ -376,6 +499,18 @@ pub struct ZookeeperClusterSpec{
 
     #[serde(rename = "config", skip_serializing_if = "Option::is_none")]
     zkconfig: Option<ZookeeperConfig>,
+
+    #[serde(rename = "probes", skip_serializing_if = "Option::is_none")]
+    probes: Option<Probes>,
+
+    #[serde(rename = "ports", skip_serializing_if = "Option::is_none")]
+    ports: Option<Vec<v1::ContainerPort>>,
+
+    #[serde(rename = "pod", skip_serializing_if = "Option::is_none")]
+    pod: Option<PodPolicy>,
+
+    #[serde(rename = "ephemeral", skip_serializing_if = "Option::is_none")]
+    ephemeral: Option<Ephemeral>,
 }
 
 
@@ -395,9 +530,13 @@ impl ZookeeperClusterSpec {
             persistence: None,
             triggerRollingRestart: None,
             zkconfig: None,
+            probes: None,
+            ports: None,
+            pod: None,
+            ephemeral: None,
         }
     }
-    pub fn with_defaults(&self) -> bool{
+    pub fn with_defaults(&self, z: &ZookeeperCluster) -> bool{
         let mut changed = false;
         if self.image.is_none() {
             self.image = Some(ContainerImage::new()); // Initialize the ContainerImage struct
@@ -417,48 +556,148 @@ impl ZookeeperClusterSpec {
             self.replicas = 3;
             changed = true;
         }
+
+        if self.probes.is_none() {
+            self.probes = Some(Probes::new()); // Initialize the Probes struct
+        }
+        if self.probes.as_ref().unwrap().with_defaults() {
+            changed = true;
+        }
+
+
+        if self.ports.is_none() {
+            self.ports = Some(vec![
+                v1::ContainerPort {
+                    name: Some("client".to_owned()),
+                    container_port: 2181,
+                    ..Default::default()
+                },
+                v1::ContainerPort {
+                    name: Some("quorum".to_owned()),
+                    container_port: 2888,
+                    ..Default::default()
+                },
+                v1::ContainerPort {
+                    name: Some("leader-election".to_owned()),
+                    container_port: 3888,
+                    ..Default::default()
+                },
+                v1::ContainerPort {
+                    name: Some("metrics".to_owned()),
+                    container_port: 7000,
+                    ..Default::default()
+                },
+                v1::ContainerPort {
+                    name: Some("admin-server".to_owned()),
+                    container_port: 8080,
+                    ..Default::default()
+                },
+            ]);
+            changed = true;
+        } else {
+            let mut found_client = false;
+            let mut found_quorum = false;
+            let mut found_leader = false;
+            let mut found_metrics = false;
+            let mut found_admin = false;
+        
+            if let Some(ports) = self.ports.as_mut() {
+                for p in ports.iter() {
+                    match p.name {
+                        Some(ref n) if n == "client" => found_client = true,
+                        Some(ref n) if n == "quorum" => found_quorum = true,
+                        Some(ref n) if n == "leader-election" => found_leader = true,
+                        Some(ref n) if n == "metrics" => found_metrics = true,
+                        Some(ref n) if n == "admin-server" => found_admin = true,
+                        _ => (),
+                    }
+                }
+                if !found_client {
+                    let port = v1::ContainerPort {
+                        name: Some("client".to_owned()),
+                        container_port: 2181,
+                        ..Default::default()
+                    };
+                    ports.push(port);
+                    changed = true;
+                }
+                if !found_quorum {
+                    let port = v1::ContainerPort {
+                        name: Some("quorum".to_owned()),
+                        container_port: 2888,
+                        ..Default::default()
+                    };
+                    ports.push(port);
+                    changed = true;
+                }
+                if !found_leader {
+                    let port = v1::ContainerPort {
+                        name: Some("leader-election".to_owned()),
+                        container_port: 3888,
+                        ..Default::default()
+                    };
+                    ports.push(port);
+                    changed = true;
+                }
+                if !found_metrics {
+                    let port = v1::ContainerPort {
+                        name: Some("metrics".to_owned()),
+                        container_port: 7000,
+                        ..Default::default()
+                    };
+                    ports.push(port);
+                    changed = true;
+                }
+                if !found_admin {
+                    let port = v1::ContainerPort {
+                        name: Some("admin-server".to_owned()),
+                        container_port: 8080,
+                        ..Default::default()
+                    };
+                    ports.push(port);
+                    changed = true;
+                }
+            }
+        }
+        
+
+
+
+        if self.pod.is_none() {
+            self.pod = Some(PodPolicy::new()); // Initialize the PodPolicy struct
+        }
+        if self.pod.as_ref().unwrap().with_defaults(z) {
+            changed = true;
+        }
+
+
         if self.storagetype.is_none() {
-            self.storagetype = Some(String::from(DEFAULT_ZK_STORAGE_TYPE));
+            self.storagetype = Some("".to_owned());
             changed = true;
         }
-        if self.persistence.is_none() {
-            self.persistence = Some(Persistence::new());
-            changed = true;
-        }
-        if self.persistence.as_ref().unwrap().with_defaults() {
-            changed = true;
+        if  self.storagetype.as_ref().unwrap() == "ephemeral" {
+            if self.ephemeral.is_none() {
+                self.ephemeral = Some(Ephemeral::new()); // Initialize the Ephemeral struct
+                self.ephemeral.as_ref().unwrap().emptydirvolumesource = Some(v1::EmptyDirVolumeSource {..Default::default()});
+                changed = true;
+            }
+        } else {
+            if self.persistence.is_none() {
+                self.storagetype = Some("persistence".to_owned());
+                self.persistence = Some(Persistence::new()); // Initialize the Persistence struct
+                changed = true;
+            }
+            if self.persistence.as_ref().unwrap().with_defaults() {
+                self.storagetype = Some("persistence".to_owned());
+                changed = true;
+            }
         }
         changed
     }
 }
 
-impl Persistence {
-    pub fn new() -> Persistence {
-        Persistence {
-            volume_reclaim_policy: None,
-            persistent_volume_claim_spec: None,
-            annotations: None,
-        }
-    }
-    pub fn with_defaults() -> bool {
-        let mut changed = false;
-        if self.volume_reclaim_policy.is_none() {
-            self.volume_reclaim_policy = Some(String::from(DEFAULT_ZK_VOLUME_RECLAIM_POLICY));
-            changed = true;
-        }
-        if self.persistent_volume_claim_spec.is_none() {
-            self.persistent_volume_claim_spec = Some(v1::PersistentVolumeClaimSpec::new());
-            changed = true;
-        }
-        if self.persistent_volume_claim_spec.as_ref().unwrap().with_defaults() {
-            changed = true;
-        }
-        if self.annotations.is_none() {
-            self.annotations = Some(std::collections::BTreeMap::new());
-            changed = true;
-        }
-        changed
-    }
+
+impl ZookeeperCluster {
     pub fn get_trigger_rolling_restart(&self) -> bool {
         self.spec.triggerRollingRestart
     }
