@@ -15,6 +15,17 @@ This project aims to write a controller for zookeeper on kubernetes in rust.
 
 2023.4.24 -- almost finish all with_defaults() check    But immutable/mutable reference is not solved.
 
-TODO --  1.using client to modify ConfigMap, SateFulSet, Service 2. figure out how to connect zookeeper/ open zookeeper cluster 3. pull a container image 
+### Supporot
 
-Not Sure: 1. Whether flags=0 in zk-Go means CreateMode::Persistent in zk-rust. 2. What is storage.is_Zero() with_defaults for Persistence
+- [x] Create CRD ZookeeperCluster in k8s API
+- [x] Create ZookeeperCluster resources/API in k8s
+- [x] Controller detects a ZookeeperCluster resources has been created
+- [x] Test the state of current ZookeeperCluster
+
+### TODO
+
+- [ ] using client to modify ConfigMap, SateFulSet, Service 
+- [ ] figure out how to connect zookeeper/ open zookeeper cluster 
+- [ ] pull a container image 
+
+*Not Sure*: 1. Whether flags=0 in zk-Go means CreateMode::Persistent in zk-rust. 2. What is storage.is_Zero() with_defaults for Persistence
